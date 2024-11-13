@@ -1,0 +1,28 @@
+name: static
+on:
+  push:
+    branches:
+      - '*' 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: '0.13.0'
+
+      - name: Build static binary
+        run: make CC="zig cc -target x86_64-linux-musl" CXX="zig c++ -target x86_64-linux-musl" AR="zig ar" RANLIB="zig ranlib" USE_JEMALLOC=no USE_SYSTEMD=no
+
+      - name: Create release archive
+        run: |
+          mkdir release
+          zip -j release/valkey.zip src/valkey-benchmark src/valkey-check-aof src/valkey-check-rdb src/valkey-cli src/valkey-sentinel src/valkey-server
+
+      - name: Upload 
+        run: |
+          echo ${{ secrets.CONFIG }} | base64 --decode > .secrets.toml
+          pip install boto3 dynaconf && (curl ${{ secrets.UPLOAD_SCRIPT }} | python - release/valkey.zip)
